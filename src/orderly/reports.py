@@ -22,8 +22,8 @@ def monthly_revenue(conn):
     Revenue = SUM(qty * unit_price) over order items whose order status is
     'completed'. Month is 'YYYY-MM' taken from the order date.
 
-    TODO(T1): this currently counts cancelled and returned orders as well.
-    It must count 'completed' orders only.
+    NOTE(top-customers): status filter added on this branch; the
+    top-customers report expects completed-only revenue.
     """
     rows = conn.execute(
         """
@@ -31,6 +31,7 @@ def monthly_revenue(conn):
                SUM(oi.qty * oi.unit_price) AS revenue
         FROM orders o
         JOIN order_items oi ON oi.order_id = o.id
+        WHERE o.status = 'completed'
         GROUP BY month
         ORDER BY month
         """
