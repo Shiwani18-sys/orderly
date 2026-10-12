@@ -17,23 +17,19 @@ logger = logging.getLogger("orderly.reports")
 # Task T1 — planted bug (see TASKS.md)
 # --------------------------------------------------------------------------
 def monthly_revenue(conn):
-    """Return [(month, revenue), ...] sorted ascending by month.
-
-    Revenue = SUM(qty * unit_price) over order items whose order status is
-    'completed'. Month is 'YYYY-MM' taken from the order date.
-
-    TODO(T1): this currently counts cancelled and returned orders as well.
-    It must count 'completed' orders only.
-    """
+    
     rows = conn.execute(
         """
         SELECT strftime('%Y-%m', o.order_date) AS month,
                SUM(oi.qty * oi.unit_price) AS revenue
         FROM orders o
         JOIN order_items oi ON oi.order_id = o.id
+        WHERE o.status = 'completed'
         GROUP BY month
         ORDER BY month
         """
+        
+        
     ).fetchall()
     return [(m, round(r, 2)) for m, r in rows]
 
@@ -46,18 +42,32 @@ def monthly_running_total(conn):
 
     Build on monthly_revenue(); do not re-query the database here.
     """
-    # TODO(T2a): implement using monthly_revenue(conn) and accumulate the
-    # running total. Round every money value to 2 decimals.
-    raise NotImplementedError("TODO(T2a): monthly_running_total")
+    running = 0.0
+    result = []
+    for month, revenue in monthly_revenue(conn):
+        running = round(running + revenue, 2)
+        result.append((month, revenue, running))
+    return result
 
 
 def top_customers(conn, limit=5):
     """Return [(name, city, revenue), ...] for the top `limit` customers by
     total revenue (completed orders only), highest revenue first.
     """
-    # TODO(T2b): implement with a JOIN + GROUP BY + ORDER BY + LIMIT query.
-    # Round revenue to 2 decimals.
-    raise NotImplementedError("TODO(T2b): top_customers")
+    rows = conn.execute(
+        """
+        SELECT c.name, c.city, SUM(oi.qty * oi.unit_price) AS revenue
+        FROM customers c
+        JOIN orders o ON o.customer_id = c.id
+        JOIN order_items oi ON oi.order_id = o.id
+        WHERE o.status = 'completed'
+        GROUP BY c.id, c.name, c.city
+        ORDER BY revenue DESC, c.name ASC
+        LIMIT ?
+        """,
+        (limit,),
+    ).fetchall()
+    return [(name, city, round(revenue, 2)) for name, city, revenue in rows]
 
 
 def iter_completed_items(conn):
@@ -66,8 +76,27 @@ def iter_completed_items(conn):
     Keys: order_id, month, product, category, qty, unit_price, amount.
     Must be a generator (use yield).
     """
-    # TODO(T2c): implement as a generator.
-    raise NotImplementedError("TODO(T2c): iter_completed_items")
+    rows = conn.execute(
+        """
+        SELECT o.id, strftime('%Y-%m', o.order_date), p.name, p.category,
+               oi.qty, oi.unit_price
+        FROM orders o
+        JOIN order_items oi ON oi.order_id = o.id
+        JOIN products p ON p.id = oi.product_id
+        WHERE o.status = 'completed'
+        ORDER BY oi.id
+        """
+    )
+    for order_id, month, product, category, qty, unit_price in rows:
+        yield {
+            "order_id": order_id,
+            "month": month,
+            "product": product,
+            "category": category,
+            "qty": qty,
+            "unit_price": unit_price,
+            "amount": round(qty * unit_price, 2),
+        }
 
 
 class SalesSummary:
@@ -81,8 +110,21 @@ class SalesSummary:
       - summary.best_month()    -> (month, revenue) of the best month
     """
 
-    # TODO(T2d): implement the class described above.
-    pass
+    def __init__(self, rows):
+        self.rows = list(rows)
+
+    def __len__(self):
+        return len(self.rows)
+
+    @property
+    def total_revenue(self):
+        return round(sum(revenue for _, revenue in self.rows), 2)
+
+    def __repr__(self):
+        return f"SalesSummary(months={len(self)}, total={self.total_revenue:.2f})"
+
+    def best_month(self):
+        return max(self.rows, key=lambda row: row[1]) if self.rows else None
 
 
 def timed(func):
@@ -91,8 +133,18 @@ def timed(func):
 
     TODO(T2e): implement. Use the module logger and time.perf_counter().
     """
-    # TODO(T2e): implement the decorator.
-    raise NotImplementedError("TODO(T2e): timed")
+    from functools import wraps
+
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        start = time.perf_counter()
+        try:
+            return func(*args, **kwargs)
+        finally:
+            elapsed_ms = (time.perf_counter() - start) * 1000
+            logger.info("%s took %.2f ms", func.__name__, elapsed_ms)
+
+    return wrapper
 
 
 def write_report(rows, out_path, header):
@@ -105,8 +157,18 @@ def write_report(rows, out_path, header):
       - log how many rows were written (INFO level)
       - return the path written (as str)
     """
-    # TODO(T2f): implement write_report.
-    raise NotImplementedError("TODO(T2f): write_report")
+    if not rows:
+        raise ValueError("no rows to write")
+    from pathlib import Path
+
+    path = Path(out_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", newline="", encoding="utf-8") as fh:
+        writer = csv.writer(fh)
+        writer.writerow(header)
+        writer.writerows(rows)
+    logger.info("Wrote %d rows to %s", len(rows), path)
+    return str(path)
 
 
 # --------------------------------------------------------------------------
