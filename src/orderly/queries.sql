@@ -15,10 +15,7 @@ WHERE o.status = 'completed'
 GROUP BY p.category
 ORDER BY revenue DESC;
 
--- @query: monthly_revenue
--- TODO(T3-Q1): monthly revenue AND order count, completed orders only,
--- one row per month ('YYYY-MM'), ordered by month. Expected columns:
--- month, revenue, order_count
+
 SELECT strftime('%Y-%m', o.order_date) AS month,
        SUM(oi.qty * oi.unit_price) AS revenue,
        COUNT(DISTINCT o.id) AS order_count
@@ -28,10 +25,7 @@ WHERE o.status = 'completed'
 GROUP BY month
 ORDER BY month;
 
--- @query: top_products_per_month
--- TODO(T3-Q2): for each month, the top 2 products by total quantity sold
--- (completed orders). Use a window function. Expected columns:
--- month, product, total_qty, rnk
+
 WITH product_month_qty AS (
     SELECT strftime('%Y-%m', o.order_date) AS month,
            p.name AS product,
@@ -54,9 +48,7 @@ FROM ranked
 WHERE rnk <= 2
 ORDER BY month, rnk;
 
--- @query: customers_without_orders
--- TODO(T3-Q3): customers who have NEVER placed a completed order.
--- Use NOT EXISTS or NOT IN. Expected columns: name, city  (ordered by name)
+
 SELECT c.name, c.city
 FROM customers c
 WHERE NOT EXISTS (
