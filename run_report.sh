@@ -2,7 +2,9 @@
 # Orderly — one-shot report runner.
 # TODO(T4): complete the four marked steps, then run this script from the
 # project root with Git Bash:  bash run_report.sh
+!/usr/bin/env bash
 set -euo pipefail
+
 
 # Step 1 — detect a Python interpreter. Try python3, then python, then py.
 # Hint: command -v prints the path of a command, or nothing if it is absent.

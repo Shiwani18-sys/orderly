@@ -1,0 +1,7 @@
+
+services:
+  orderly:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: orderly:1
