@@ -17,7 +17,14 @@ logger = logging.getLogger("orderly.reports")
 # Task T1 — planted bug (see TASKS.md)
 # --------------------------------------------------------------------------
 def monthly_revenue(conn):
-    
+    """Return [(month, revenue), ...] sorted ascending by month.
+
+    Revenue = SUM(qty * unit_price) over order items whose order status is
+    'completed'. Month is 'YYYY-MM' taken from the order date.
+
+    TODO(T1): this currently counts cancelled and returned orders as well.
+    It must count 'completed' orders only.
+    """
     rows = conn.execute(
         """
         SELECT strftime('%Y-%m', o.order_date) AS month,
